@@ -3,5 +3,7 @@ name = "nanobv"
 version = "0.1.0"
 authors = ["inspier <devdevin541@gmail.com>"]
 edition = "2018"
+description = "Lorem ipsum"
+license = "MIT"
 
 [dependencies]
