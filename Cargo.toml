@@ -6,4 +6,5 @@ edition = "2018"
 description = "Lorem ipsum"
 license = "MIT"
 
-[dependencies]
+[dev-dependencies]
+paste = "1.0.4"

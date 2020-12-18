@@ -1,6 +1,6 @@
 use core::mem::size_of;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub struct NanoBV<T = u32> {
     data: T,
     length: usize,
@@ -11,18 +11,11 @@ impl<T> NanoBV<T> {
         NanoBV { data, length }
     }
 
-    #[inline]
     pub const fn len(&self) -> usize {
         self.length
     }
-
-    #[inline]
-    pub const fn is_empty(&self) -> bool {
-        self.length == 0
-    }
 }
 
-#[macro_use]
 macro_rules! ImplNanoBVCommon {
     (for $($type:tt),+) => {
         $(ImplNanoBVCommon!($type);)*
@@ -31,26 +24,47 @@ macro_rules! ImplNanoBVCommon {
     ($type:ident) => {
 
         impl NanoBV<$type> {
-            pub const fn clear(&self, begin: usize, end: usize) -> $type {
-                if begin > end || (end - begin) > self.length {
-                    self.data
-                } else {
-                    $type::MAX << end | ((1 << begin) - 1) & self.data
+            const BIT_SIZE: usize = size_of::<$type>() * 8;
+
+            pub const fn default() -> Self {
+                NanoBV::new($type::MIN, size_of::<$type>() * 8)
+            }
+
+            pub const fn value(&self) -> $type {
+                self.data
+            }
+
+            const fn max(length: usize) -> $type {
+                if length == NanoBV::<$type>::BIT_SIZE {
+                return $type::MAX;
                 }
+                (1 << length) - 1
+            }
+
+            pub const fn set_value(mut self, value: $type) {
+                self.data = value & Self::max(self.length);
+            }
+
+            pub const fn clear(mut self) {
+                self.data = 0;
+            }
+
+            pub const fn set(mut self) {
+                self.data = Self::max(self.length);
+            }
+
+            pub const fn zeros(length: usize) -> Self {
+                NanoBV::new(0, length)
+            }
+
+            pub const fn ones(length: usize) -> Self {
+                NanoBV::<$type>::new(Self::max(length), length)
             }
 
             pub const fn reverse(&self) -> NanoBV<$type> {
-                let mut bit_size = (size_of::<$type>() * 8);
-                let mut mask = !0;
-                let mut v = self.data;
-                bit_size >>= 1;
-                while bit_size > 0 {
-                    mask ^= (mask << bit_size);
-                    v = ((v >> bit_size) & mask) | ((v << bit_size) & !mask);
-                    bit_size >>= 1;
-                }
-                v >>= (size_of::<$type>() * 8) - self.length;
-                NanoBV::<$type>::new(v, self.length)
+                let mut reversed = self.data.reverse_bits();
+                reversed >>= (size_of::<$type>() * 8) - self.length;
+                NanoBV::<$type>::new(reversed, self.length)
             }
         }
     };
@@ -61,36 +75,31 @@ ImplNanoBVCommon!(for u8, u16, u32, u64);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use paste::paste;
 
-    #[test]
-    fn smallbitvec_u8_reverse() {
-        assert_eq!(
-            NanoBV::<u8>::new(0x1D, 7).reverse(),
-            NanoBV::<u8>::new(0x5C, 7)
-        );
+    macro_rules! ImplNanoBVTest {
+        (for $($type:tt),+) => {
+            $(ImplNanoBVTest!($type);)*
+        };
+
+        ($type:ident) => {
+        paste! {
+            #[test]
+            fn [<test_nanobv_zeros_ $type>]() {
+                let bv = NanoBV::<$type>::zeros(size_of::<$type>() * 8);
+                assert_eq!(bv.value(), 0);
+                assert_eq!(bv.len(), size_of::<$type>() * 8);
+            }
+
+            #[test]
+            fn [<test_nanobv_ones_ $type>]() {
+                let bv = NanoBV::<$type>::ones(size_of::<$type>() * 8);
+                assert_eq!(bv.value(), $type::MAX);
+                assert_eq!(bv.len(), size_of::<$type>() * 8);
+            }
+        }
+        };
     }
 
-    #[test]
-    fn smallbitvec_u16_reverse() {
-        assert_eq!(
-            NanoBV::<u16>::new(0x071F, 13).reverse(),
-            NanoBV::<u16>::new(0x1F1C, 13)
-        );
-    }
-
-    #[test]
-    fn smallbitvec_u32_reverse() {
-        assert_eq!(
-            NanoBV::<u32>::new(0xC71F, 17).reverse(),
-            NanoBV::<u32>::new(0x0001_F1C6, 17)
-        );
-    }
-
-    #[test]
-    fn smallbitvec_u64_reverse() {
-        assert_eq!(
-            NanoBV::<u64>::new(0xC71F, 17).reverse(),
-            NanoBV::<u64>::new(0x0001_F1C6, 17)
-        );
-    }
+    ImplNanoBVTest!(for u8, u16, u32, u64);
 }
