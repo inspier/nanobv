@@ -1,6 +1,8 @@
+#![no_std]
+
 use core::mem::size_of;
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub struct NanoBV<T = u32> {
     data: T,
     length: usize,
@@ -75,6 +77,13 @@ macro_rules! ImplNanoBVCommon {
                 NanoBV::new(new_value, self.length)
             }
 
+            pub const fn assign_bit(&self, value: $type, offset: $type) -> Self {
+                match value {
+                0 => self.clear_bit(offset),
+                _ => self.set_bit(offset),
+                }
+            }
+
             pub const fn reverse(&self) -> NanoBV<$type> {
                 let mut reversed = self.data.reverse_bits();
                 reversed >>= Self::BIT_SIZE - self.length;
@@ -90,6 +99,7 @@ ImplNanoBVCommon!(for u8, u16, u32, u64);
 mod tests {
     use super::*;
     use paste::paste;
+    use picorand::{PicoRandGenerate, WyRand, RNG};
 
     macro_rules! ImplNanoBVTest {
         (for $($type:tt),+) => {
@@ -112,6 +122,15 @@ mod tests {
                 let bv = NBV::ones(NBV::BIT_SIZE);
                 assert_eq!(bv.value(), $type::MAX);
                 assert_eq!(bv.len(), NBV::BIT_SIZE);
+            }
+
+            #[test]
+            fn [<test_nanobv_reverse_ $type>]() {
+                type NBV = NanoBV::<$type>;
+                let mut rng = RNG::<WyRand, $type>::new(0xDEADBEEF);
+                let data = rng.generate();
+                let bv = NBV::new(data, NBV::BIT_SIZE);
+                assert_eq!(bv.reverse().value(), data.reverse_bits());
             }
         }
         };

@@ -8,3 +8,4 @@ license = "MIT"
 
 [dev-dependencies]
 paste = "1.0.4"
+picorand = "0.1.1"
