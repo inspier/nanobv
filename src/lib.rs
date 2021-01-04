@@ -1,8 +1,12 @@
 #![no_std]
 
-use core::mem::size_of;
+use core::{
+    cmp::min,
+    mem::size_of,
+    ops::{Add, BitAnd, BitOr},
+};
 
-#[derive(PartialEq, Eq, Copy, Clone)]
+#[derive(PartialEq, Debug, Eq, Copy, Clone)]
 pub struct NanoBV<T = u32> {
     data: T,
     length: usize,
@@ -27,6 +31,13 @@ macro_rules! ImplNanoBVCommon {
         impl NanoBV<$type> {
             const BIT_SIZE: usize = size_of::<$type>() * 8;
 
+            const fn max(length: usize) -> $type {
+                match length {
+                    Self::BIT_SIZE => $type::MAX,
+                    _ => (1 << length) - 1,
+                }
+            }
+
             pub const fn default() -> Self {
                 NanoBV::new($type::MIN, Self::BIT_SIZE)
             }
@@ -35,24 +46,9 @@ macro_rules! ImplNanoBVCommon {
                 self.data
             }
 
-            const fn max(length: usize) -> $type {
-                match length {
-                    Self::BIT_SIZE => $type::MAX,
-                    _ => (1 << length) - 1,
-                }
-            }
-
             pub const fn set_value(&self, value: $type) -> Self {
                 let new_value = value & Self::max(self.length);
                 NanoBV::new(new_value, self.length)
-            }
-
-            pub const fn clear(&self) -> Self {
-                NanoBV::new(0, self.length)
-            }
-
-            pub const fn set(&self) -> Self {
-                NanoBV::new(Self::max(self.length), self.length)
             }
 
             pub const fn zeros(length: usize) -> Self {
@@ -61,6 +57,14 @@ macro_rules! ImplNanoBVCommon {
 
             pub const fn ones(length: usize) -> Self {
                 NanoBV::new(Self::max(length), length)
+            }
+
+            pub const fn clear(&self) -> Self {
+                NanoBV::new(0, self.length)
+            }
+
+            pub const fn set(&self) -> Self {
+                NanoBV::new(Self::max(self.length), self.length)
             }
 
             pub const fn get_bit(&self, offset: $type) -> $type {
@@ -94,6 +98,24 @@ macro_rules! ImplNanoBVCommon {
 }
 
 ImplNanoBVCommon!(for u8, u16, u32, u64);
+
+macro_rules! ImplNanoBVOps {
+    (for $(($trait:tt, $function:tt)),+) => {
+        $(ImplNanoBVOps!($trait, $function);)*
+    };
+
+    ($trait:ident, $function:ident) => {
+        impl<T: $trait + $trait<Output = T>> $trait for NanoBV<T> {
+            type Output = Self;
+
+            fn $function(self, other: Self) -> Self {
+                Self::new(self.data.$function(other.data), min(self.length, other.length))
+            }
+        }
+    };
+}
+
+ImplNanoBVOps!(for (Add, add), (BitAnd, bitand), (BitOr, bitor));
 
 #[cfg(test)]
 mod tests {
