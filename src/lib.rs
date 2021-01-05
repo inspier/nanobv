@@ -2,6 +2,7 @@
 
 use core::{
     cmp::min,
+    convert::{TryFrom, TryInto},
     mem::size_of,
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub},
 };
@@ -13,11 +14,6 @@ pub struct NanoBV<T = u32> {
 }
 
 impl<T> NanoBV<T> {
-    /// Create a new [`NanoBV`].
-    pub const fn new(data: T, length: usize) -> Self {
-        NanoBV { data, length }
-    }
-
     /// Retrieve length of the current NanoBV.
     pub const fn len(&self) -> usize {
         self.length
@@ -45,10 +41,15 @@ macro_rules! ImplNanoBVCommon {
                 }
             }
 
+            /// Create a new [`NanoBV`].
+            pub const fn new(data: $type, length: usize) -> Self {
+                NanoBV { data: data & Self::upper_bound(length), length }
+            }
+
             /// Create a [`NanoBV`] initialized to 0 with length equivalent to the size of the
             /// stored type.
             pub const fn default() -> Self {
-                NanoBV::new($type::MIN, Self::BIT_SIZE)
+                NanoBV::<$type>::new($type::MIN, Self::BIT_SIZE)
             }
 
             /// Retrieve value of the current NanoBV.
@@ -59,17 +60,17 @@ macro_rules! ImplNanoBVCommon {
             /// Set value of the current NanoBV while retaining length.
             pub const fn set_value(&self, value: $type) -> Self {
                 let new_value = value & Self::upper_bound(self.length);
-                NanoBV::new(new_value, self.length)
+                NanoBV::<$type>::new(new_value, self.length)
             }
 
             /// Create [`NanoBV`] with all bits unset.
             pub const fn zeros(length: usize) -> Self {
-                NanoBV::new(0, length)
+                NanoBV::<$type>::new(0, length)
             }
 
             /// Create [`NanoBV`] with all bits set.
             pub const fn ones(length: usize) -> Self {
-                NanoBV::new(Self::upper_bound(length), length)
+                NanoBV::<$type>::new(Self::upper_bound(length), length)
             }
 
             /// Clear all bits.
@@ -90,13 +91,13 @@ macro_rules! ImplNanoBVCommon {
             /// Set bit at offset.
             pub const fn set_bit(&self, offset: $type) -> Self {
                 let new_value = self.data | (1 << offset) & Self::upper_bound(self.length);
-                NanoBV::new(new_value, self.length)
+                NanoBV::<$type>::new(new_value, self.length)
             }
 
             /// Clear bit at offset.
             pub const fn clear_bit(&self, offset: $type) -> Self {
                 let new_value = self.data & !(1 << offset);
-                NanoBV::new(new_value, self.length)
+                NanoBV::<$type>::new(new_value, self.length)
             }
 
             /// Assign bit at offset.
@@ -111,7 +112,7 @@ macro_rules! ImplNanoBVCommon {
             pub const fn reverse(&self) -> NanoBV<$type> {
                 let mut reversed = self.data.reverse_bits();
                 reversed >>= (Self::BIT_SIZE - self.length) as $type;
-                NanoBV::new(reversed, self.length)
+                NanoBV::<$type>::new(reversed, self.length)
             }
         }
     };
@@ -125,11 +126,12 @@ macro_rules! ImplNanoBVOps {
     };
 
     ($trait:ident, $function:ident) => {
-        impl<T: $trait + $trait<Output = T>> $trait for NanoBV<T> {
+        impl<T: $trait + $trait<Output = T> + TryFrom<u128> + TryInto<u128> + Default> $trait for NanoBV<T> {
             type Output = Self;
 
             fn $function(self, other: Self) -> Self {
-                Self::new(self.data.$function(other.data), min(self.length, other.length))
+                let data = self.data.$function(other.data).try_into().unwrap_or_default();
+                Self { data: T::try_from(data).unwrap_or_default(), length: min(self.length, other.length) }
             }
         }
     };
