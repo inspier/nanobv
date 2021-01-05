@@ -1,3 +1,3 @@
 # nanobv
 
-Lightweight no_std-compatible const-fn oriented BitVector implementation.
+Lightweight no_std-compatible mostly const-fn oriented BitVector implementation.
