@@ -13,14 +13,17 @@ pub struct NanoBV<T = u32> {
 }
 
 impl<T> NanoBV<T> {
+    /// Create a new [`NanoBV`].
     pub const fn new(data: T, length: usize) -> Self {
         NanoBV { data, length }
     }
 
+    /// Retrieve length of the current NanoBV.
     pub const fn len(&self) -> usize {
         self.length
     }
 
+    #[doc(hidden)]
     pub const fn is_empty(&self) -> bool {
         self.length == 0
     }
@@ -42,49 +45,61 @@ macro_rules! ImplNanoBVCommon {
                 }
             }
 
+            /// Create a [`NanoBV`] initialized to 0 with length equivalent to the size of the
+            /// stored type.
             pub const fn default() -> Self {
                 NanoBV::new($type::MIN, Self::BIT_SIZE)
             }
 
+            /// Retrieve value of the current NanoBV.
             pub const fn value(&self) -> $type {
                 self.data
             }
 
+            /// Set value of the current NanoBV while retaining length.
             pub const fn set_value(&self, value: $type) -> Self {
                 let new_value = value & Self::upper_bound(self.length);
                 NanoBV::new(new_value, self.length)
             }
 
+            /// Create [`NanoBV`] with all bits unset.
             pub const fn zeros(length: usize) -> Self {
                 NanoBV::new(0, length)
             }
 
+            /// Create [`NanoBV`] with all bits set.
             pub const fn ones(length: usize) -> Self {
                 NanoBV::new(Self::upper_bound(length), length)
             }
 
+            /// Clear all bits.
             pub const fn clear(&self) -> Self {
-                NanoBV::new(0, self.length)
+                Self::zeros(self.length)
             }
 
+            /// Set all bits.
             pub const fn set(&self) -> Self {
-                NanoBV::new(Self::upper_bound(self.length), self.length)
+                Self::ones(self.length)
             }
 
+            /// Get bit at offset.
             pub const fn get_bit(&self, offset: $type) -> $type {
                 (self.data >> offset) & 1
             }
 
+            /// Set bit at offset.
             pub const fn set_bit(&self, offset: $type) -> Self {
                 let new_value = self.data | (1 << offset) & Self::upper_bound(self.length);
                 NanoBV::new(new_value, self.length)
             }
 
+            /// Clear bit at offset.
             pub const fn clear_bit(&self, offset: $type) -> Self {
                 let new_value = self.data & !(1 << offset);
                 NanoBV::new(new_value, self.length)
             }
 
+            /// Assign bit at offset.
             pub const fn assign_bit(&self, value: $type, offset: $type) -> Self {
                 match value {
                 0 => self.clear_bit(offset),
@@ -92,6 +107,7 @@ macro_rules! ImplNanoBVCommon {
                 }
             }
 
+            /// Reverse bits.
             pub const fn reverse(&self) -> NanoBV<$type> {
                 let mut reversed = self.data.reverse_bits();
                 reversed >>= (Self::BIT_SIZE - self.length) as $type;
@@ -151,11 +167,58 @@ mod tests {
             }
 
             #[test]
+            fn [<test_nanobv_default_ $type>]() {
+                type NBV = NanoBV::<$type>;
+                let bv = NBV::default();
+                assert_eq!(bv, NBV::zeros(NBV::BIT_SIZE));
+            }
+
+            #[test]
+            fn [<test_nanobv_get_bit_ $type>]() {
+                type NBV = NanoBV::<$type>;
+                let bv = NBV::new($type::MAX, NBV::BIT_SIZE);
+                let mut rng = RNG::<WyRand, $type>::new($type::MAX as _);
+                let offset = rng.generate_range(0, NBV::BIT_SIZE);
+                assert_eq!(bv.get_bit(offset), 1);
+            }
+
+            #[test]
+            fn [<test_nanobv_set_bit_ $type>]() {
+                type NBV = NanoBV::<$type>;
+                let mut bv = NBV::new($type::MIN, NBV::BIT_SIZE);
+                let mut rng = RNG::<WyRand, $type>::new($type::MAX as _);
+                let offset = rng.generate_range(0, NBV::BIT_SIZE);
+                bv = bv.set_bit(offset);
+                assert_eq!(bv.get_bit(offset), 1);
+            }
+
+            #[test]
+            fn [<test_nanobv_clear_bit_ $type>]() {
+                type NBV = NanoBV::<$type>;
+                let mut bv = NBV::new($type::MAX, NBV::BIT_SIZE);
+                let mut rng = RNG::<WyRand, $type>::new($type::MAX as _);
+                let offset = rng.generate_range(0, NBV::BIT_SIZE);
+                bv = bv.clear_bit(offset);
+                assert_eq!(bv.get_bit(offset), 0);
+            }
+
+            #[test]
+            fn [<test_nanobv_assign_bit_ $type>]() {
+                type NBV = NanoBV::<$type>;
+                let mut bv = NBV::new($type::MAX, NBV::BIT_SIZE);
+                let mut rng = RNG::<WyRand, $type>::new($type::MAX as _);
+                let offset = rng.generate_range(0, NBV::BIT_SIZE);
+                let value = rng.generate_range(0, 2);
+                bv = bv.assign_bit(value, offset);
+                assert_eq!(bv.get_bit(offset), value);
+            }
+
+            #[test]
             fn [<test_nanobv_reverse_ $type>]() {
                 type NBV = NanoBV::<$type>;
-                let mut rng = RNG::<WyRand, $type>::new(0xDEADBEEF);
+                let mut rng = RNG::<WyRand, $type>::new($type::MAX as _);
                 let data = rng.generate();
-                let bv = NBV::new(data, NBV::BIT_SIZE as _);
+                let bv = NBV::new(data, NBV::BIT_SIZE);
                 assert_eq!(bv.reverse().value(), data.reverse_bits());
             }
         }
