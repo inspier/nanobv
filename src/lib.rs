@@ -185,31 +185,31 @@ mod tests {
             #[test]
             fn [<test_nanobv_set_bit_ $type>]() {
                 type NBV = NanoBV::<$type>;
-                let mut bv = NBV::new($type::MIN, NBV::BIT_SIZE);
+
                 let mut rng = RNG::<WyRand, $type>::new($type::MAX as _);
                 let offset = rng.generate_range(0, NBV::BIT_SIZE);
-                bv = bv.set_bit(offset);
+                let bv = NBV::new($type::MIN, NBV::BIT_SIZE).set_bit(offset);
                 assert_eq!(bv.get_bit(offset), 1);
             }
 
             #[test]
             fn [<test_nanobv_clear_bit_ $type>]() {
                 type NBV = NanoBV::<$type>;
-                let mut bv = NBV::new($type::MAX, NBV::BIT_SIZE);
+
                 let mut rng = RNG::<WyRand, $type>::new($type::MAX as _);
                 let offset = rng.generate_range(0, NBV::BIT_SIZE);
-                bv = bv.clear_bit(offset);
+                let bv = NBV::new($type::MAX, NBV::BIT_SIZE).clear_bit(offset);
                 assert_eq!(bv.get_bit(offset), 0);
             }
 
             #[test]
             fn [<test_nanobv_assign_bit_ $type>]() {
                 type NBV = NanoBV::<$type>;
-                let mut bv = NBV::new($type::MAX, NBV::BIT_SIZE);
+
                 let mut rng = RNG::<WyRand, $type>::new($type::MAX as _);
                 let offset = rng.generate_range(0, NBV::BIT_SIZE);
                 let value = rng.generate_range(0, 2);
-                bv = bv.assign_bit(value, offset);
+                let bv = NBV::new($type::MAX, NBV::BIT_SIZE).assign_bit(value, offset);
                 assert_eq!(bv.get_bit(offset), value);
             }
 
