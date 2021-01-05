@@ -130,8 +130,9 @@ macro_rules! ImplNanoBVOps {
             type Output = Self;
 
             fn $function(self, other: Self) -> Self {
-                let data = self.data.$function(other.data).try_into().unwrap_or_default();
-                Self { data: T::try_from(data).unwrap_or_default(), length: min(self.length, other.length) }
+                let length = min(self.length, other.length);
+                let data = self.data.$function(other.data).try_into().unwrap_or_default() & ((1u128 << length) - 1);
+                Self { data: T::try_from(data).unwrap_or_default(), length }
             }
         }
     };
