@@ -3,7 +3,7 @@
 use core::{
     cmp::min,
     mem::size_of,
-    ops::{Add, BitAnd, BitOr},
+    ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub},
 };
 
 #[derive(PartialEq, Debug, Eq, Copy, Clone)]
@@ -20,6 +20,10 @@ impl<T> NanoBV<T> {
     pub const fn len(&self) -> usize {
         self.length
     }
+
+    pub const fn is_empty(&self) -> bool {
+        self.length == 0
+    }
 }
 
 macro_rules! ImplNanoBVCommon {
@@ -31,7 +35,7 @@ macro_rules! ImplNanoBVCommon {
         impl NanoBV<$type> {
             const BIT_SIZE: usize = size_of::<$type>() * 8;
 
-            const fn max(length: usize) -> $type {
+            const fn upper_bound(length: usize) -> $type {
                 match length {
                     Self::BIT_SIZE => $type::MAX,
                     _ => (1 << length) - 1,
@@ -47,7 +51,7 @@ macro_rules! ImplNanoBVCommon {
             }
 
             pub const fn set_value(&self, value: $type) -> Self {
-                let new_value = value & Self::max(self.length);
+                let new_value = value & Self::upper_bound(self.length);
                 NanoBV::new(new_value, self.length)
             }
 
@@ -56,7 +60,7 @@ macro_rules! ImplNanoBVCommon {
             }
 
             pub const fn ones(length: usize) -> Self {
-                NanoBV::new(Self::max(length), length)
+                NanoBV::new(Self::upper_bound(length), length)
             }
 
             pub const fn clear(&self) -> Self {
@@ -64,7 +68,7 @@ macro_rules! ImplNanoBVCommon {
             }
 
             pub const fn set(&self) -> Self {
-                NanoBV::new(Self::max(self.length), self.length)
+                NanoBV::new(Self::upper_bound(self.length), self.length)
             }
 
             pub const fn get_bit(&self, offset: $type) -> $type {
@@ -72,7 +76,7 @@ macro_rules! ImplNanoBVCommon {
             }
 
             pub const fn set_bit(&self, offset: $type) -> Self {
-                let new_value = self.data | (1 << offset) & Self::max(self.length);
+                let new_value = self.data | (1 << offset) & Self::upper_bound(self.length);
                 NanoBV::new(new_value, self.length)
             }
 
@@ -90,7 +94,7 @@ macro_rules! ImplNanoBVCommon {
 
             pub const fn reverse(&self) -> NanoBV<$type> {
                 let mut reversed = self.data.reverse_bits();
-                reversed >>= Self::BIT_SIZE - self.length;
+                reversed >>= (Self::BIT_SIZE - self.length) as $type;
                 NanoBV::new(reversed, self.length)
             }
         }
@@ -115,7 +119,7 @@ macro_rules! ImplNanoBVOps {
     };
 }
 
-ImplNanoBVOps!(for (Add, add), (BitAnd, bitand), (BitOr, bitor));
+ImplNanoBVOps!(for (Add, add), (BitAnd, bitand), (BitOr, bitor), (BitXor, bitxor), (Div, div), (Mul, mul), (Rem, rem), (Shl, shl), (Shr, shr), (Sub, sub));
 
 #[cfg(test)]
 mod tests {
@@ -151,7 +155,7 @@ mod tests {
                 type NBV = NanoBV::<$type>;
                 let mut rng = RNG::<WyRand, $type>::new(0xDEADBEEF);
                 let data = rng.generate();
-                let bv = NBV::new(data, NBV::BIT_SIZE);
+                let bv = NBV::new(data, NBV::BIT_SIZE as _);
                 assert_eq!(bv.reverse().value(), data.reverse_bits());
             }
         }
