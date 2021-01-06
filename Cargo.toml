@@ -3,8 +3,13 @@ name = "nanobv"
 version = "0.1.0"
 authors = ["inspier <devdevin541@gmail.com>"]
 edition = "2018"
-description = "Lorem ipsum"
+documentation = "https://docs.rs/nanobv"
+repository = "https://github.com/inspier/nanobv"
+description = "Lightweight no_std-compatible const_fn oriented BitVector implementation."
 license = "MIT"
+keywords = ["bit-vector", "const-fn"]
+categories = ["no-std"]
+readme = "README.md"
 
 [dev-dependencies]
 paste = "1.0.4"
