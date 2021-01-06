@@ -1,7 +1,6 @@
 #![no_std]
 
 use core::{
-    cmp::min,
     convert::{TryFrom, TryInto},
     mem::size_of,
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub},
@@ -43,6 +42,7 @@ macro_rules! ImplNanoBVCommon {
 
             /// Create a new [`NanoBV`].
             pub const fn new(data: $type, length: usize) -> Self {
+                ["Invalid length provided."][((length < 1) || (length > Self::BIT_SIZE)) as usize];
                 NanoBV { data: data & Self::upper_bound(length), length }
             }
 
@@ -85,23 +85,27 @@ macro_rules! ImplNanoBVCommon {
 
             /// Get bit at offset.
             pub const fn get_bit(&self, offset: $type) -> $type {
+                ["Invalid offset provided."][(offset as usize >= self.length) as usize];
                 (self.data >> offset) & 1
             }
 
             /// Set bit at offset.
             pub const fn set_bit(&self, offset: $type) -> Self {
+                ["Invalid offset provided."][(offset as usize >= self.length) as usize];
                 let new_value = self.data | (1 << offset) & Self::upper_bound(self.length);
                 NanoBV::<$type>::new(new_value, self.length)
             }
 
             /// Clear bit at offset.
             pub const fn clear_bit(&self, offset: $type) -> Self {
+                ["Invalid offset provided."][(offset as usize >= self.length) as usize];
                 let new_value = self.data & !(1 << offset);
                 NanoBV::<$type>::new(new_value, self.length)
             }
 
             /// Assign bit at offset.
             pub const fn assign_bit(&self, value: $type, offset: $type) -> Self {
+                ["Invalid offset provided."][(offset as usize >= self.length) as usize];
                 match value {
                 0 => self.clear_bit(offset),
                 _ => self.set_bit(offset),
@@ -109,10 +113,60 @@ macro_rules! ImplNanoBVCommon {
             }
 
             /// Reverse bits.
-            pub const fn reverse(&self) -> NanoBV<$type> {
+            pub const fn reverse(&self) -> Self {
                 let mut reversed = self.data.reverse_bits();
                 reversed >>= (Self::BIT_SIZE - self.length) as $type;
                 NanoBV::<$type>::new(reversed, self.length)
+            }
+
+            /// const_fn alternative to [`core::ops::Add`].
+            pub const fn bvadd(&self, rhs: Self) -> Self {
+                NanoBV::<$type>::new(self.data + rhs.data, $crate::internals::min(self.length, rhs.length))
+            }
+
+            /// const_fn alternative to [`core::ops::BitAnd`].
+            pub const fn bvand(&self, rhs: Self) -> Self {
+                NanoBV::<$type>::new(self.data & rhs.data, $crate::internals::min(self.length, rhs.length))
+            }
+
+            /// const_fn alternative to [`core::ops::BitOr`].
+            pub const fn bvor(&self, rhs: Self) -> Self {
+                NanoBV::<$type>::new(self.data | rhs.data, $crate::internals::min(self.length, rhs.length))
+            }
+
+            /// const_fn alternative to [`core::ops::BitXor`].
+            pub const fn bvxor(&self, rhs: Self) -> Self {
+                NanoBV::<$type>::new(self.data ^ rhs.data, $crate::internals::min(self.length, rhs.length))
+            }
+
+            /// const_fn alternative to [`core::ops::Div`].
+            pub const fn bvdiv(&self, rhs: Self) -> Self {
+                NanoBV::<$type>::new(self.data / rhs.data, $crate::internals::min(self.length, rhs.length))
+            }
+
+            /// const_fn alternative to [`core::ops::Mul`].
+            pub const fn bvmul(&self, rhs: Self) -> Self {
+                NanoBV::<$type>::new(self.data * rhs.data, $crate::internals::min(self.length, rhs.length))
+            }
+
+            /// const_fn alternative to [`core::ops::Rem`].
+            pub const fn bvrem(&self, rhs: Self) -> Self {
+                NanoBV::<$type>::new(self.data % rhs.data, $crate::internals::min(self.length, rhs.length))
+            }
+
+            /// const_fn alternative to [`core::ops::Shl`].
+            pub const fn bvshl(&self, rhs: Self) -> Self {
+                NanoBV::<$type>::new(self.data << rhs.data, $crate::internals::min(self.length, rhs.length))
+            }
+
+            /// const_fn alternative to [`core::ops::Shr`].
+            pub const fn bvshr(&self, rhs: Self) -> Self {
+                NanoBV::<$type>::new(self.data >> rhs.data, $crate::internals::min(self.length, rhs.length))
+            }
+
+            /// const_fn alternative to [`core::ops::Sub`].
+            pub const fn bvsub(&self, rhs: Self) -> Self {
+                NanoBV::<$type>::new(self.data - rhs.data, $crate::internals::min(self.length, rhs.length))
             }
         }
     };
@@ -130,15 +184,22 @@ macro_rules! ImplNanoBVOps {
             type Output = Self;
 
             fn $function(self, other: Self) -> Self {
-                let length = min(self.length, other.length);
-                let data = self.data.$function(other.data).try_into().unwrap_or_default() & ((1u128 << length) - 1);
-                Self { data: T::try_from(data).unwrap_or_default(), length }
+                let length = $crate::internals::min(self.length, other.length);
+                let data = T::try_from(self.data.$function(other.data).try_into().unwrap_or_default() & ((1u128 << length) - 1)).unwrap_or_default();
+                Self { data, length }
             }
         }
     };
 }
 
 ImplNanoBVOps!(for (Add, add), (BitAnd, bitand), (BitOr, bitor), (BitXor, bitxor), (Div, div), (Mul, mul), (Rem, rem), (Shl, shl), (Shr, shr), (Sub, sub));
+
+#[doc(hidden)]
+pub mod internals {
+    pub const fn min(a: usize, b: usize) -> usize {
+        [a, b][(a >= b) as usize]
+    }
+}
 
 #[cfg(test)]
 mod tests {
