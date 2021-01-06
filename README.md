@@ -7,5 +7,5 @@ Lightweight no_std-compatible const_fn oriented BitVector implementation.
 
 To add to your Cargo.toml:
 ```toml
-nanobv = "0.1.0"
+nanobv = "0.1.1"
 ```
