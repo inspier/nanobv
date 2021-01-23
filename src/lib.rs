@@ -3,24 +3,25 @@
 use core::{
     convert::{TryFrom, TryInto},
     mem::size_of,
+    num::NonZeroUsize,
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub},
 };
 
 #[derive(PartialEq, Debug, Eq, Copy, Clone)]
 pub struct NanoBV<T = u32> {
     data: T,
-    length: usize,
+    length: NonZeroUsize,
 }
 
 impl<T> NanoBV<T> {
     /// Retrieve length of the current NanoBV.
     pub const fn len(&self) -> usize {
-        self.length
+        self.length.get()
     }
 
     #[doc(hidden)]
     pub const fn is_empty(&self) -> bool {
-        self.length == 0
+        self.length.get() == 0
     }
 }
 
@@ -43,7 +44,7 @@ macro_rules! ImplNanoBVCommon {
             /// Create a new [`NanoBV`].
             pub const fn new(data: $type, length: usize) -> Self {
                 ["Invalid length provided."][((length < 1) || (length > Self::BIT_SIZE)) as usize];
-                NanoBV { data: data & Self::upper_bound(length), length }
+                NanoBV { data: data & Self::upper_bound(length), length: unsafe { NonZeroUsize::new_unchecked(length) } }
             }
 
             /// Create a [`NanoBV`] initialized to 0 with length equivalent to the size of the
@@ -59,8 +60,8 @@ macro_rules! ImplNanoBVCommon {
 
             /// Set value of the current NanoBV while retaining length.
             pub const fn set_value(&self, value: $type) -> Self {
-                let new_value = value & Self::upper_bound(self.length);
-                NanoBV::<$type>::new(new_value, self.length)
+                let new_value = value & Self::upper_bound(self.len());
+                NanoBV::<$type>::new(new_value, self.len())
             }
 
             /// Create [`NanoBV`] with all bits unset.
@@ -75,37 +76,37 @@ macro_rules! ImplNanoBVCommon {
 
             /// Clear all bits.
             pub const fn clear(&self) -> Self {
-                Self::zeros(self.length)
+                Self::zeros(self.len())
             }
 
             /// Set all bits.
             pub const fn set(&self) -> Self {
-                Self::ones(self.length)
+                Self::ones(self.len())
             }
 
             /// Get bit at offset.
             pub const fn get_bit(&self, offset: $type) -> $type {
-                ["Invalid offset provided."][(offset as usize >= self.length) as usize];
+                ["Invalid offset provided."][(offset as usize >= self.len()) as usize];
                 (self.data >> offset) & 1
             }
 
             /// Set bit at offset.
             pub const fn set_bit(&self, offset: $type) -> Self {
-                ["Invalid offset provided."][(offset as usize >= self.length) as usize];
-                let new_value = self.data | (1 << offset) & Self::upper_bound(self.length);
-                NanoBV::<$type>::new(new_value, self.length)
+                ["Invalid offset provided."][(offset as usize >= self.len()) as usize];
+                let new_value = self.data | (1 << offset) & Self::upper_bound(self.len());
+                NanoBV::<$type>::new(new_value, self.len())
             }
 
             /// Clear bit at offset.
             pub const fn clear_bit(&self, offset: $type) -> Self {
-                ["Invalid offset provided."][(offset as usize >= self.length) as usize];
+                ["Invalid offset provided."][(offset as usize >= self.len()) as usize];
                 let new_value = self.data & !(1 << offset);
-                NanoBV::<$type>::new(new_value, self.length)
+                NanoBV::<$type>::new(new_value, self.len())
             }
 
             /// Assign bit at offset.
             pub const fn assign_bit(&self, value: $type, offset: $type) -> Self {
-                ["Invalid offset provided."][(offset as usize >= self.length) as usize];
+                ["Invalid offset provided."][(offset as usize >= self.len()) as usize];
                 match value {
                 0 => self.clear_bit(offset),
                 _ => self.set_bit(offset),
@@ -115,58 +116,58 @@ macro_rules! ImplNanoBVCommon {
             /// Reverse bits.
             pub const fn reverse(&self) -> Self {
                 let mut reversed = self.data.reverse_bits();
-                reversed >>= (Self::BIT_SIZE - self.length) as $type;
-                NanoBV::<$type>::new(reversed, self.length)
+                reversed >>= (Self::BIT_SIZE - self.len()) as $type;
+                NanoBV::<$type>::new(reversed, self.len())
             }
 
             /// const_fn alternative to [`core::ops::Add`].
             pub const fn bvadd(&self, rhs: Self) -> Self {
-                NanoBV::<$type>::new(self.data + rhs.data, $crate::internals::min(self.length, rhs.length))
+                NanoBV::<$type>::new(self.data + rhs.data, $crate::internals::min(self.len(), rhs.len()))
             }
 
             /// const_fn alternative to [`core::ops::BitAnd`].
             pub const fn bvand(&self, rhs: Self) -> Self {
-                NanoBV::<$type>::new(self.data & rhs.data, $crate::internals::min(self.length, rhs.length))
+                NanoBV::<$type>::new(self.data & rhs.data, $crate::internals::min(self.len(), rhs.len()))
             }
 
             /// const_fn alternative to [`core::ops::BitOr`].
             pub const fn bvor(&self, rhs: Self) -> Self {
-                NanoBV::<$type>::new(self.data | rhs.data, $crate::internals::min(self.length, rhs.length))
+                NanoBV::<$type>::new(self.data | rhs.data, $crate::internals::min(self.len(), rhs.len()))
             }
 
             /// const_fn alternative to [`core::ops::BitXor`].
             pub const fn bvxor(&self, rhs: Self) -> Self {
-                NanoBV::<$type>::new(self.data ^ rhs.data, $crate::internals::min(self.length, rhs.length))
+                NanoBV::<$type>::new(self.data ^ rhs.data, $crate::internals::min(self.len(), rhs.len()))
             }
 
             /// const_fn alternative to [`core::ops::Div`].
             pub const fn bvdiv(&self, rhs: Self) -> Self {
-                NanoBV::<$type>::new(self.data / rhs.data, $crate::internals::min(self.length, rhs.length))
+                NanoBV::<$type>::new(self.data / rhs.data, $crate::internals::min(self.len(), rhs.len()))
             }
 
             /// const_fn alternative to [`core::ops::Mul`].
             pub const fn bvmul(&self, rhs: Self) -> Self {
-                NanoBV::<$type>::new(self.data * rhs.data, $crate::internals::min(self.length, rhs.length))
+                NanoBV::<$type>::new(self.data * rhs.data, $crate::internals::min(self.len(), rhs.len()))
             }
 
             /// const_fn alternative to [`core::ops::Rem`].
             pub const fn bvrem(&self, rhs: Self) -> Self {
-                NanoBV::<$type>::new(self.data % rhs.data, $crate::internals::min(self.length, rhs.length))
+                NanoBV::<$type>::new(self.data % rhs.data, $crate::internals::min(self.len(), rhs.len()))
             }
 
             /// const_fn alternative to [`core::ops::Shl`].
             pub const fn bvshl(&self, rhs: Self) -> Self {
-                NanoBV::<$type>::new(self.data << rhs.data, $crate::internals::min(self.length, rhs.length))
+                NanoBV::<$type>::new(self.data << rhs.data, $crate::internals::min(self.len(), rhs.len()))
             }
 
             /// const_fn alternative to [`core::ops::Shr`].
             pub const fn bvshr(&self, rhs: Self) -> Self {
-                NanoBV::<$type>::new(self.data >> rhs.data, $crate::internals::min(self.length, rhs.length))
+                NanoBV::<$type>::new(self.data >> rhs.data, $crate::internals::min(self.len(), rhs.len()))
             }
 
             /// const_fn alternative to [`core::ops::Sub`].
             pub const fn bvsub(&self, rhs: Self) -> Self {
-                NanoBV::<$type>::new(self.data - rhs.data, $crate::internals::min(self.length, rhs.length))
+                NanoBV::<$type>::new(self.data - rhs.data, $crate::internals::min(self.len(), rhs.len()))
             }
         }
     };
@@ -184,9 +185,9 @@ macro_rules! ImplNanoBVOps {
             type Output = Self;
 
             fn $function(self, other: Self) -> Self {
-                let length = $crate::internals::min(self.length, other.length);
+                let length = $crate::internals::min(self.len(), other.len());
                 let data = T::try_from(self.data.$function(other.data).try_into().unwrap_or_default() & ((1u128 << length) - 1)).unwrap_or_default();
-                Self { data, length }
+                Self { data, length: NonZeroUsize::new(length).unwrap() }
             }
         }
     };
