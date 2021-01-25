@@ -34,17 +34,19 @@ macro_rules! ImplNanoBVCommon {
         impl NanoBV<$type> {
             const BIT_SIZE: usize = size_of::<$type>() * 8;
 
-            const fn upper_bound(length: usize) -> $type {
-                match length {
-                    Self::BIT_SIZE => $type::MAX,
-                    _ => (1 << length) - 1,
+            const fn upper_bound(length: NonZeroUsize) -> $type {
+                let length = length.get();
+                if length >= Self::BIT_SIZE {
+                    return $type::MAX;
                 }
+                (1 << length) - 1
             }
 
             /// Create a new [`NanoBV`].
             pub const fn new(data: $type, length: usize) -> Self {
                 ["Invalid length provided."][((length < 1) || (length > Self::BIT_SIZE)) as usize];
-                NanoBV { data: data & Self::upper_bound(length), length: unsafe { NonZeroUsize::new_unchecked(length) } }
+                let length = unsafe { NonZeroUsize::new_unchecked(length) };
+                NanoBV { data: data & Self::upper_bound(length), length }
             }
 
             /// Create a [`NanoBV`] initialized to 0 with length equivalent to the size of the
@@ -60,18 +62,20 @@ macro_rules! ImplNanoBVCommon {
 
             /// Set value of the current NanoBV while retaining length.
             pub const fn set_value(&self, value: $type) -> Self {
-                let new_value = value & Self::upper_bound(self.len());
+                let new_value = value & Self::upper_bound(self.length);
                 NanoBV::<$type>::new(new_value, self.len())
             }
 
             /// Create [`NanoBV`] with all bits unset.
             pub const fn zeros(length: usize) -> Self {
+                ["Invalid length provided."][((length < 1) || (length > Self::BIT_SIZE)) as usize];
                 NanoBV::<$type>::new(0, length)
             }
 
             /// Create [`NanoBV`] with all bits set.
             pub const fn ones(length: usize) -> Self {
-                NanoBV::<$type>::new(Self::upper_bound(length), length)
+                ["Invalid length provided."][((length < 1) || (length > Self::BIT_SIZE)) as usize];
+                NanoBV::<$type>::new(Self::upper_bound(unsafe { NonZeroUsize::new_unchecked(length) }), length)
             }
 
             /// Clear all bits.
@@ -93,7 +97,7 @@ macro_rules! ImplNanoBVCommon {
             /// Set bit at offset.
             pub const fn set_bit(&self, offset: $type) -> Self {
                 ["Invalid offset provided."][(offset as usize >= self.len()) as usize];
-                let new_value = self.data | (1 << offset) & Self::upper_bound(self.len());
+                let new_value = self.data | (1 << offset) & Self::upper_bound(self.length);
                 NanoBV::<$type>::new(new_value, self.len())
             }
 
