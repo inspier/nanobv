@@ -35,11 +35,10 @@ macro_rules! ImplNanoBVCommon {
             const BIT_SIZE: usize = size_of::<$type>() * 8;
 
             const fn upper_bound(length: NonZeroUsize) -> $type {
-                let length = length.get();
-                if length >= Self::BIT_SIZE {
-                    return $type::MAX;
+                match length.get() {
+                n if n < Self::BIT_SIZE => (1 << n) - 1,
+                _ => $type::MAX,
                 }
-                (1 << length) - 1
             }
 
             /// Create a new [`NanoBV`].
